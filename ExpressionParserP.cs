@@ -86,14 +86,35 @@ namespace ExpressionParser
                 {
                     ops[i] = BuildExp(exp, token.childs[i+1]);
                 }
-                return new OpFun(ops, func);
+                return new OpFun(namestr, ops, func);
             }
             return null;
         }
 
         private IOperator BuildFactor(string exp, Token token)
         {
-            return BuildOperator(exp, token.childs[0]);
+            var res = BuildOperator(exp, token.childs[0]);
+            if (token.range.begin < token.childs[0].range.begin && exp[token.range.begin] == '-')
+            {
+                res = MakeNeg(res);
+            }
+            return res;
+        }
+
+        private IOperator MakeNeg(IOperator res)
+        {
+            if(res is OpNeg ng)
+            {
+                return ng.Child; // 负负得正
+            }
+            else if(res is OpConst cn) // 直接数字
+            {
+                return new OpConst(-cn.Calc(null));
+            }
+            else
+            {
+                return new OpNeg(res);
+            }
         }
 
         private IOperator BuildExp(string exp, Token token)
@@ -103,7 +124,7 @@ namespace ExpressionParser
                    var op = BuildTerm(exp, term);
                    if (term.type == TokenType.TERM_SUB)
                    {
-                       op = new OpMinus(op);
+                       op = MakeNeg(op);
                    }
                    return op;
                });

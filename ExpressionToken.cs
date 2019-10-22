@@ -106,9 +106,11 @@ namespace ExpressionParser
 
         private Token GetFactor(string exp, int begin)
         {
-            // const | variable | group | function
-            Token t = null;
+            // const | -?(variable | group | function)
+            int len = exp.Length;
+            if (begin >= len) return null;
 
+            Token t = null;
             if (t == null)
             {
                 t = GetFunction(exp, begin);
@@ -124,6 +126,17 @@ namespace ExpressionParser
             if (t == null)
             {
                 t = GetConst(exp, begin);
+            }
+            if (t == null)
+            {
+                if(exp[begin] == '-')
+                {
+                    t = GetFactor(exp, begin + 1);
+                    if (t != null)
+                    {
+                        t.range.begin = begin;
+                    }
+                }
             }
             if (t == null)
             {
