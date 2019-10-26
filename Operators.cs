@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -83,10 +84,10 @@ namespace ExpressionParser
             base.Optimize();
             // 遍历所有子项，如果有OpAdd的，把这个子项的所有子项提到当前
             var add_items = _operators.Where(p => p.Item1 is OpAdd);
-            if (add_items.Count() > 0)
+            if (add_items.Any())
             {
                 var childs = add_items.Select(p => ((OpAdd)p.Item1)._operators).Aggregate((a, b) => a.Concat(b));
-                if (childs.Count() > 0)
+                if (childs.Any())
                 {
                     _operators = _operators.Where(p => !(p.Item1 is OpAdd)).Concat(childs);
                     // 重建变量位置信息
@@ -101,8 +102,8 @@ namespace ExpressionParser
             if (v != 0)
             {
                 IOperator op = new OpConst(v);
-                var tmp = _operators.ToList();
-                tmp.Add(Tuple.Create(op, new int[0]));
+                var tmp = new List<Tuple<IOperator, int[]>>() { Tuple.Create(op, new int[0]) };
+                tmp.AddRange(_operators);
                 _operators = tmp;
             }
         }
@@ -117,7 +118,7 @@ namespace ExpressionParser
                 {                    
                     if (res.Length ==0 || s[0] == '-')
                     {
-                        res = res + s;
+                        res += s;
                     }
                     else
                     {
@@ -144,10 +145,10 @@ namespace ExpressionParser
             base.Optimize();
             // 遍历所有子项，如果有OpMul的，把这个子项的所有子项提到当前
             var add_items = _operators.Where(p => p.Item1 is OpMul);
-            if (add_items.Count() > 0)
+            if (add_items.Any())
             {
                 var childs = add_items.Select(p => ((OpMul)p.Item1)._operators).Aggregate((a, b) => a.Concat(b));
-                if (childs.Count() > 0)
+                if (childs.Any())
                 {
                     _operators = _operators.Where(p => !(p.Item1 is OpMul)).Concat(childs);
                     // 重建变量位置信息
@@ -164,8 +165,8 @@ namespace ExpressionParser
                 if (v != 1)
                 {
                     IOperator op = new OpConst(v);
-                    var tmp = _operators.ToList();
-                    tmp.Add(Tuple.Create(op, new int[0]));
+                    var tmp = new List<Tuple<IOperator, int[]>>() { Tuple.Create(op, new int[0]) };
+                    tmp.AddRange(_operators);
                     _operators = tmp;
                 }
             }
@@ -193,11 +194,11 @@ namespace ExpressionParser
 
                     if (res.Length == 0 || s[0] == '/')
                     {
-                        res = res + s;
+                        res += s;
                     }
                     else
                     {
-                        res = res + "*" + s;
+                        res += "*" + s;
                     }
                 }
             }
@@ -208,8 +209,8 @@ namespace ExpressionParser
 
     class OpFun : OpBase
     {
-        string _name;
-        Func<double[], double> _func;
+        readonly string _name;
+        readonly Func<double[], double> _func;
         public OpFun(string name, IOperator[] input, Func<double[], double> func) : base(input)
         {
             _func = func;
@@ -232,7 +233,7 @@ namespace ExpressionParser
                     if (s.Length > 0 && s[0] == '/') s = '1' + s;
                     if (res.Length == 0)
                     {
-                        res = res + s;
+                        res += s;
                     }
                     else
                     {
@@ -247,7 +248,7 @@ namespace ExpressionParser
 
     class OpConst : IOperator
     {
-        double _v;
+        readonly double _v;
         public static string[] _keys = new string[0];
         public OpConst(double v)
         {
@@ -269,13 +270,13 @@ namespace ExpressionParser
         }
         public string GetString()
         {
-            return _v.ToString();
+            return _v.ToString(CultureInfo.InvariantCulture);
         }
     }
 
     class OpVar : IOperator
     {
-        string[] _keys;
+        readonly string[] _keys;
         public OpVar(string name)
         {
             _keys = new string[] { name };
@@ -301,25 +302,46 @@ namespace ExpressionParser
         }
     }
 
-    class OpNeg : IOperator
+    abstract class OpSingle : IOperator
     {
-        IOperator _op;
+        protected IOperator _op;
+
         public IOperator Child => _op;
+        public IOperator TermChild
+        {
+            get
+            {
+                var res = Child;
+                while(res is OpSingle t)
+                {
+                    res = t.Child;
+                }
+                return res;
+            }
+        }
+        public abstract double Calc(double[] input);
+        public abstract string[] GetKeys();
+        public abstract void Optimize(); // 尽量减少节点数
+        public abstract string GetString(); // 转换回字符串
+    }
+
+    class OpNeg : OpSingle
+    {
         public OpNeg(IOperator op)
         {
             _op = op;
         }
-        public double Calc(double[] input)
+        public override double Calc(double[] input)
         {
             return -_op.Calc(input);
         }
 
-        public string[] GetKeys()
+        public override string[] GetKeys()
         {
             return _op.GetKeys();
         }
 
-        public string GetString()
+        public override string GetString()
         {
             var s = _op.GetString();
             if(s.Length > 0)
@@ -336,7 +358,7 @@ namespace ExpressionParser
             return s;
         }
 
-        public void Optimize()
+        public override void Optimize()
         {
             if(_op.GetKeys().Length == 0)
             {
@@ -348,23 +370,22 @@ namespace ExpressionParser
             }
         }
     }
-    class OpInv : IOperator
+    class OpInv : OpSingle
     {
-        IOperator _op;
         public OpInv(IOperator op)
         {
             _op = op;
         }
-        public double Calc(double[] input)
+        public override double Calc(double[] input)
         {
             return 1.0 / _op.Calc(input);
         }
 
-        public string[] GetKeys()
+        public override string[] GetKeys()
         {
             return _op.GetKeys();
         }
-        public void Optimize()
+        public override void Optimize()
         {
             if (_op.GetKeys().Length == 0)
             {
@@ -375,12 +396,12 @@ namespace ExpressionParser
                 _op.Optimize();
             }
         }
-        public string GetString()
+        public override string GetString()
         {
             var s = _op.GetString();
             if (s.Length > 0)
             {
-                if (_op is OpAdd || _op is OpMul)
+                if (_op is OpAdd || TermChild is OpMul) // 由于OpNeg的子项为Mul时不加括号，这里要考虑
                 {
                     s = '(' + s + ')';
                 }

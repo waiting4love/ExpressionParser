@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,47 +12,57 @@ namespace ExpressionParser
         public IOperator Parse(string exp)
         {
             var token = BuildToken(exp);
-            if (token == null || token.range.end != exp.Length) return null;
+            if (token == null || token.Range.End != exp.Length) return null;
             return BuildOperator(exp, token);
         }
 
         public IOperator BuildOperator(string exp, Token token)
         {
-            switch(token.type)
+            if (token == null)
+            {
+                throw new ArgumentNullException(nameof(token));
+            }
+            if (exp == null)
+            {
+                throw new ArgumentNullException(nameof(exp));
+            }
+            switch (token.Type)
             {
                 case TokenType.CONST:
                     return BuildConst(exp, token);
                 case TokenType.EXP:
                     return BuildExp(exp, token);
                 case TokenType.FACTOR:
-                case TokenType.FACTOR_DIV:
-                case TokenType.FACTOR_MUL:
+                case TokenType.FACTORDIV:
+                case TokenType.FACTORMUL:
                     return BuildFactor(exp, token);
                 case TokenType.FUNCTION:
                     return BuildFunction(exp, token);
                 case TokenType.GROUP:
                     return BuildGroup(exp, token);
                 case TokenType.TERM:
-                case TokenType.TERM_ADD:
-                case TokenType.TERM_SUB:
+                case TokenType.TERMADD:
+                case TokenType.TERMSUB:
                     return BuildTerm(exp, token);
                 case TokenType.VARIABLE:
                     return BuildVariable(exp, token);
+                default:
+                    break;
             }
             return null;
         }
 
-        private IOperator BuildVariable(string exp, Token token)
+        private static IOperator BuildVariable(string exp, Token token)
         {
-            return new OpVar(exp.Substring(token.range.begin, token.range.end - token.range.begin));
+            return new OpVar(exp.Substring(token.Range.Begin, token.Range.End - token.Range.Begin));
         }
 
         private IOperator BuildTerm(string exp, Token token)
         {
-            var ops = token.childs.Select(term =>
+            var ops = token.Childs.Select(term =>
             {
                 var op = BuildFactor(exp, term);
-                if (term.type == TokenType.FACTOR_DIV)
+                if (term.Type == TokenType.FACTORDIV)
                 {
                     op = new OpInv(op);
                 }
@@ -71,20 +82,20 @@ namespace ExpressionParser
 
         private IOperator BuildGroup(string exp, Token token)
         {
-            return BuildExp(exp, token.childs[0]);
+            return BuildExp(exp, token.Childs[0]);
         }
 
         private IOperator BuildFunction(string exp, Token token)
         {
-            var nametk = token.childs[0];
-            var namestr = exp.Substring(nametk.range.begin, nametk.range.end - nametk.range.begin);
+            var nametk = token.Childs[0];
+            var namestr = exp.Substring(nametk.Range.Begin, nametk.Range.End - nametk.Range.Begin);
             if(FunctionTable.TryGetValue(namestr, out Func<double[], double> func))
             {
-                var argsLen = token.childs.Count - 1;
+                var argsLen = token.Childs.Count - 1;
                 IOperator[] ops = new IOperator[argsLen];
                 for(int i=0; i<argsLen;i++)
                 {
-                    ops[i] = BuildExp(exp, token.childs[i+1]);
+                    ops[i] = BuildExp(exp, token.Childs[i+1]);
                 }
                 return new OpFun(namestr, ops, func);
             }
@@ -93,15 +104,15 @@ namespace ExpressionParser
 
         private IOperator BuildFactor(string exp, Token token)
         {
-            var res = BuildOperator(exp, token.childs[0]);
-            if (token.range.begin < token.childs[0].range.begin && exp[token.range.begin] == '-')
+            var res = BuildOperator(exp, token.Childs[0]);
+            if (token.Range.Begin < token.Childs[0].Range.Begin && exp[token.Range.Begin] == '-')
             {
                 res = MakeNeg(res);
             }
             return res;
         }
 
-        private IOperator MakeNeg(IOperator res)
+        private static IOperator MakeNeg(IOperator res)
         {
             if(res is OpNeg ng)
             {
@@ -119,10 +130,10 @@ namespace ExpressionParser
 
         private IOperator BuildExp(string exp, Token token)
         {
-            var ops = token.childs.Select(term =>
+            var ops = token.Childs.Select(term =>
                {
                    var op = BuildTerm(exp, term);
-                   if (term.type == TokenType.TERM_SUB)
+                   if (term.Type == TokenType.TERMSUB)
                    {
                        op = MakeNeg(op);
                    }
@@ -140,9 +151,22 @@ namespace ExpressionParser
             }
         }
 
-        private IOperator BuildConst(string exp, Token token)
+        private static IOperator BuildConst(string exp, Token token)
         {
-            return new OpConst(Convert.ToDouble(exp.Substring(token.range.begin, token.range.end - token.range.begin)));
+            if (token == null)
+            {
+                throw new ArgumentNullException(nameof(token));
+            }
+            if (exp == null)
+            {
+                throw new ArgumentNullException(nameof(exp));
+            }
+            return new OpConst(
+                Convert.ToDouble(
+                    exp.Substring(token.Range.Begin, token.Range.End - token.Range.Begin),
+                    CultureInfo.InvariantCulture
+                    )
+                );
         }
     }
 }
