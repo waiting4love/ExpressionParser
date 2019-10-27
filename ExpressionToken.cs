@@ -283,43 +283,44 @@ namespace ExpressionParser
         // function.childs: variable, exp, exp, exp...
         private Token GetFunction(string exp, int begin)
         {
-            // variable >> '(' >> exp >> (',' >> exp)* >> ')'
+            // variable >> '(' >> (exp >> (',' >> exp)*)? >> ')'
             int len = exp.Length;
             if (begin >= len) return null;
 
             var varRange = ReadVeriable(exp, begin);
             if (varRange.Begin == varRange.End) return null;
 
-            // check FunctionTable here
-
+            // todo: check FunctionTable here
             int gpos = SkipWS(exp, varRange.End);
             if (gpos >= len || exp[gpos++] != '(' ) return null;
-
-            var exp1 = GetExp(exp, SkipWS(exp, gpos));
-            if (exp1 == null) return null;
 
             Token res = new Token()
             {
                 Type = TokenType.FUNCTION,
                 Range = new Range { Begin = begin },
-                Childs = new List<Token>() {
-                    new Token() { Type = TokenType.VARIABLE, Range = varRange },
-                    exp1
+                Childs = new List<Token>()
+                {
+                    new Token() { Type = TokenType.VARIABLE, Range = varRange }
                 }
             };
 
-            gpos = SkipWS(exp, exp1.Range.End);
-            while (gpos < len - 1 && exp[gpos] == ',')
+            gpos = SkipWS(exp, gpos);
+            var exp1 = GetExp(exp, gpos);
+            if (exp1 != null)
             {
-                gpos = SkipWS(exp, gpos + 1);
-                var exp2 = GetExp(exp, gpos);
-                if (exp2 == null) return null;
-                res.Childs.Add(exp2);
-                gpos = SkipWS(exp, exp2.Range.End);
+                res.Childs.Add(exp1);
+                gpos = SkipWS(exp, exp1.Range.End);
+                while (gpos < len - 1 && exp[gpos] == ',')
+                {
+                    gpos = SkipWS(exp, gpos + 1);
+                    var exp2 = GetExp(exp, gpos);
+                    if (exp2 == null) return null;
+                    res.Childs.Add(exp2);
+                    gpos = SkipWS(exp, exp2.Range.End);
+                }
             }
 
-            // check childs number and FunctionTable define
-
+            // todo: check childs number and FunctionTable define
             if (gpos >= len || exp[gpos] != ')' ) return null;
             res.Range.End = gpos + 1;
             return res;            
