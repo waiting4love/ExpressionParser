@@ -36,6 +36,7 @@ namespace ExpressionParser
         }
         public double Calc(double[] param)
         {
+            if (param.Length < _keys.Length) return Double.NaN;
             var midres = _operators.Select(op => op.Item1.Calc(op.Item2.Select(i => param[i]).ToArray())).ToArray();
             return DoCalc(midres);
         }
@@ -284,7 +285,7 @@ namespace ExpressionParser
 
         public double Calc(double[] input)
         {
-            return input[0];
+            return input.Length>0? input[0] : double.NaN;
         }
 
         public string[] GetKeys()
