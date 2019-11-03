@@ -13,7 +13,8 @@ namespace ExpressionParser
         {
             var token = BuildToken(exp);
             if (token == null || token.Range.End != exp.Length) return null;
-            return BuildOperator(exp, token);
+            var op = BuildOperator(exp, token);
+            return op == null? null : new OpCheckParam(op);
         }
 
         public IOperator BuildOperator(string exp, Token token)

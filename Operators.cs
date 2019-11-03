@@ -36,7 +36,7 @@ namespace ExpressionParser
         }
         public double Calc(double[] param)
         {
-            if (param.Length < _keys.Length) return Double.NaN;
+            // if (param.Length < _keys.Length) return Double.NaN;
             var midres = _operators.Select(op => op.Item1.Calc(op.Item2.Select(i => param[i]).ToArray())).ToArray();
             return DoCalc(midres);
         }
@@ -285,7 +285,8 @@ namespace ExpressionParser
 
         public double Calc(double[] input)
         {
-            return input.Length>0? input[0] : double.NaN;
+            // return input.Length>0? input[0] : double.NaN;
+            return input[0];
         }
 
         public string[] GetKeys()
@@ -326,6 +327,35 @@ namespace ExpressionParser
         public abstract string GetString(); // 转换回字符串
     }
 
+    class OpCheckParam : OpSingle
+    {
+        public OpCheckParam(IOperator op)
+        {
+            _op = op;
+        }
+        public override double Calc(double[] input)
+        {
+            var keys = _op.GetKeys();
+            var num = input == null ? 0 : input.Length;
+            if (num < keys.Length) return Double.NaN;
+            return _op.Calc(input);
+        }
+
+        public override string[] GetKeys()
+        {
+            return _op.GetKeys();
+        }
+
+        public override string GetString()
+        {
+            return _op.GetString();
+        }
+
+        public override void Optimize()
+        {
+            _op.Optimize();
+        }
+    }
     class OpNeg : OpSingle
     {
         public OpNeg(IOperator op)
